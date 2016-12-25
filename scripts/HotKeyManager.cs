@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Windows.Forms;
 
 public class HotKeyManager : Form
@@ -13,18 +12,19 @@ public class HotKeyManager : Form
     [DllImport("user32.dll")]
     private extern static int UnregisterHotKey(IntPtr hWnd, int id);
 
-    private List<HotKeyAndProcedureBinding> hotKeyAndProcedureBindings = new List<HotKeyAndProcedureBinding>();
-    private class HotKeyAndProcedureBinding
+    private List<HotKeyAndActionBinding> hotKeyAndActionBindings = new List<HotKeyAndActionBinding>();
+    private class HotKeyAndActionBinding
     {
         public int modKey;
         public Keys key;
         public int hotKeyId;
-        public ThreadStart procedure;
+        public Action<string> action;
+        public string actionArgument;
         public override string ToString()
         {
             return string.Format(
-                "{{modKey={0}, key={1}, hotKeyId={2}, procedure={3}}}",
-                modKey, key, hotKeyId, procedure
+                "{{modKey={0}, key={1}, hotKeyId={2}, action={3}, actionArgument={4}}}",
+                modKey, key, hotKeyId, action, actionArgument
             );
         }
     }
@@ -37,18 +37,20 @@ public class HotKeyManager : Form
 
     private static int idIndex = 0x0000;
 
-    public void RegisterHotKeyAndItsProcedure(int modKey, Keys key, ThreadStart procedure)
+    public void RegisterHotKeyAndItsAction(int modKey, Keys key,
+                                           Action<string> action, string actionArgument)
     {
         while (idIndex <= 0xbfff)
         {
             if (RegisterHotKey(this.Handle, idIndex, modKey, key) != 0)
             {
-                var binding = new HotKeyAndProcedureBinding();
+                var binding = new HotKeyAndActionBinding();
                 binding.modKey = modKey;
                 binding.key = key;
                 binding.hotKeyId = idIndex++;
-                binding.procedure = procedure;
-                hotKeyAndProcedureBindings.Add(binding);
+                binding.action = action;
+                binding.actionArgument = actionArgument;
+                hotKeyAndActionBindings.Add(binding);
                 break;
             }
             idIndex++;
@@ -57,7 +59,7 @@ public class HotKeyManager : Form
 
     public string GetBindingsInformation()
     {
-        var bindingListInString = hotKeyAndProcedureBindings.Select(b => b.ToString()).ToList();
+        var bindingListInString = hotKeyAndActionBindings.Select(b => b.ToString()).ToList();
         return "[" + string.Join(", ", bindingListInString) + "]";
     }
 
@@ -69,11 +71,11 @@ public class HotKeyManager : Form
 
         if (message.Msg == WM_HOTKEY)
         {
-            foreach (var eachBinding in hotKeyAndProcedureBindings)
+            foreach (var eachBinding in hotKeyAndActionBindings)
             {
                 if ((int)message.WParam == eachBinding.hotKeyId)
                 {
-                    eachBinding.procedure();
+                    eachBinding.action(eachBinding.actionArgument);
                 }
             }
         }
@@ -82,7 +84,7 @@ public class HotKeyManager : Form
     protected override void Dispose(bool disposing)
     {
         // Unregister all HotKeys
-        hotKeyAndProcedureBindings.ForEach(binding => UnregisterHotKey(this.Handle, binding.hotKeyId));
+        hotKeyAndActionBindings.ForEach(binding => UnregisterHotKey(this.Handle, binding.hotKeyId));
 
         base.Dispose(disposing);
     }

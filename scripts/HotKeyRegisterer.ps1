@@ -5,17 +5,18 @@ New-Module -ArgumentList $thisDirectoryPath {
 
   $Script:HotKeyManagerInstance = $null
 
-  function Register-HotKeys($HotKeyList)
+  function Register-HotKeys($HotKeyList, $KeyHitAction)
   {
     Add-Type -Path (Join-Path $thisDirectoryPath 'HotKeyManager.cs') `
              -ReferencedAssemblies ('System.Windows.Forms', 'System.Core')
     $Script:HotKeyManagerInstance = New-Object HotKeyManager
 
     $MODKEY_VALUE_TABLE = @{
-      ALT   = 0x0001;
-      CTRL  = 0x0002;
-      SHIFT = 0x0004;
-      NA    = 0x0000;
+      ALT     = 0x0001;
+      CTRL    = 0x0002;
+      CONTROL = 0x0002;
+      SHIFT   = 0x0004;
+      NA      = 0x0000;
     }
     
     filter Get-ModifierKeyValue
@@ -33,7 +34,7 @@ New-Module -ArgumentList $thisDirectoryPath {
 
       # extract modifier key
       $modkeyList = $keyList | foreach { $_.ToUpper() } | Get-ModifierKeyValue 
-      $modkey = $modkeyList -join ' -bor ' | Invoke-Expression # evaluate binary OR
+      $modkey = $modkeyList -join ' -bor ' | Invoke-Expression # evaluate binary-OR
 
       # extract key
       $keyCandidates = $keyList | where { -not $MODKEY_VALUE_TABLE.Contains($_) }
@@ -42,11 +43,12 @@ New-Module -ArgumentList $thisDirectoryPath {
       return $modkey, $key
     }
 
-    # register HotKey and its procedure
+    # register HotKey and its action
     $HotKeyList | foreach {
-      $modKey, $key = DivideInto-ModKeyAndKey $_.KeyString
-      $procedure = $_.Procedure
-      $Script:HotKeyManagerInstance.RegisterHotKeyAndItsProcedure($modKey, $key, $procedure)
+      $modKey, $key = DivideInto-ModKeyAndKey $_.BeforeKey
+      $action = $KeyHitAction
+      $actionArgument = $_.AfterKey
+      $Script:HotKeyManagerInstance.RegisterHotKeyAndItsAction($modKey, $key, $action, $actionArgument)
     }
 
     # (for debug)
@@ -66,4 +68,4 @@ New-Module -ArgumentList $thisDirectoryPath {
 
   Export-ModuleMember -Function Register-HotKeys
   Export-ModuleMember -Function Unregister-HotKeys
-}
+} | Out-Null

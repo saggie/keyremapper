@@ -1,13 +1,17 @@
 # load modules
 $thisDirectoryPath = Split-Path $MyInvocation.MyCommand.Path -Parent
-$parentDirectoryPath = Split-Path $thisDirectoryPath -Parent
-Invoke-Expression (Join-Path $thisDirectoryPath 'HotKeyRegisterer.ps1') | Out-Null
-Invoke-Expression (Join-Path $parentDirectoryPath 'settings.ps1') | Out-Null
+Invoke-Expression (Join-Path $thisDirectoryPath 'HotKeyRegisterer.ps1')
+Invoke-Expression (Join-Path $thisDirectoryPath 'SettingsLoader.ps1')
 
 function Start-Main()
 {
   $Script:AppName = "KeyRemapper"
   $Script:ThisIcon = $null
+
+  [Action[string]]$keyHitAction = {
+    param([string]$keyString)
+    [System.Windows.Forms.SendKeys]::SendWait($keyString)
+  }
 
   function Close-ThisIcon()
   {
@@ -41,7 +45,7 @@ function Start-Main()
   $Script:ThisIcon = Create-ThisIcon
   
   $remapKeyList = Get-RemapKeyList
-  Register-HotKeys -HotKeyList $remapKeyList
+  Register-HotKeys -HotKeyList $remapKeyList -KeyHitAction $keyHitAction
 }
 Start-Main
 
